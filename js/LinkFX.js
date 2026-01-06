@@ -1,4 +1,5 @@
-﻿import { app } from "../../../scripts/app.js";
+console.log("🔥 LinkFX loaded");
+import { app } from "../../../scripts/app.js";
 
 const EXTENSION_NAME = "LinkFX";
 const SIDEBAR_TAB_ID = "linkfx";
@@ -32,7 +33,7 @@ const ANIMATION_MODES = [
     { id: "selected", icon: "\uD83C\uDFAF", label: "Selected Node" }
 ];
 
-const DEBUG = false;
+const DEBUG = true; // Enabled for debugging
 const log = (...args) => { if (DEBUG) console.info(LOG_PREFIX, ...args); };
 const warn = (...args) => console.warn(LOG_PREFIX, ...args);
 
@@ -729,6 +730,128 @@ function registerSidebarTab() {
     tryRegister();
 }
 
+function registerLegacyMenuButton() {
+    log("registerLegacyMenuButton called");
+    const tryRegister = function () {
+        log("Checking for old UI...");
+
+        if (!app || !app.ui) {
+            log("app.ui not ready, retrying...");
+            setTimeout(tryRegister, 200);
+            return;
+        }
+
+        // Check if we're in the new UI (has sidebar support)
+        const hasNewUI = app.extensionManager && app.extensionManager.registerSidebarTab;
+        if (hasNewUI) {
+            log("New UI detected, skipping legacy menu button");
+            return;
+        }
+
+        log("Old UI detected, looking for queue button...");
+
+        // Find the queue button (same approach as Crystools)
+        const queueButton = document.getElementById('queue-button');
+        
+        if (!queueButton) {
+            log("Queue button not found, retrying...");
+            setTimeout(tryRegister, 200);
+            return;
+        }
+
+        log("Queue button found, creating LinkFX button");
+        
+        const button = document.createElement("button");
+        button.id = "linkfx-menu-button";
+        button.innerHTML = "✨ Link FX";
+        button.style.cssText = `
+            padding: 4px 8px;
+            margin: 2px;
+            border: none;
+            border-radius: 4px;
+            background: var(--bg-color, #222);
+            color: var(--fg-color, #ddd);
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            transition: background 0.2s;
+        `;
+        
+        button.addEventListener("mouseenter", function() {
+            this.style.background = "var(--bg-color-hover, #333)";
+        });
+        
+        button.addEventListener("mouseleave", function() {
+            this.style.background = "var(--bg-color, #222)";
+        });
+        
+        // Create floating panel
+        let panel = null;
+        button.addEventListener("click", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (panel) {
+                log("Closing panel");
+                panel.remove();
+                panel = null;
+                return;
+            }
+            
+            log("Opening panel");
+            panel = document.createElement("div");
+            panel.style.cssText = `
+                position: fixed;
+                top: 60px;
+                right: 20px;
+                width: 280px;
+                max-height: 80vh;
+                background: var(--comfy-menu-bg, #1a1a1a);
+                border: 1px solid var(--border-color, #444);
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                z-index: 9999;
+                overflow-y: auto;
+            `;
+            
+            const closeBtn = document.createElement("button");
+            closeBtn.innerHTML = "×";
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                width: 24px;
+                height: 24px;
+                border: none;
+                border-radius: 4px;
+                background: rgba(255,255,255,0.1);
+                color: #fff;
+                font-size: 18px;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                z-index: 1;
+            `;
+            closeBtn.addEventListener("click", function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                panel.remove();
+                panel = null;
+            });
+            
+            panel.appendChild(closeBtn);
+            buildSidebarContent(panel);
+            document.body.appendChild(panel);
+        });
+        
+        // Insert after queue button (same as Crystools does)
+        queueButton.insertAdjacentElement('afterend', button);
+        log("Legacy menu button registered successfully!");
+    };
+    
+    tryRegister();
+}
+
 function buildSidebarContent(container) {
     container.innerHTML = "";
     container.style.display = "flex";
@@ -1054,9 +1177,96 @@ function installHooks() {
 
 app.registerExtension({
     name: EXTENSION_NAME,
-    init: function () {
-        log("initializing...");
+    async setup() {
+        log("=== SETUP CALLED ===");
+        log("app exists:", !!app);
+        log("document.querySelector('.comfy-menu'):", document.querySelector(".comfy-menu"));
+        
+        // Try new UI sidebar first
         registerSidebarTab();
+        
+        // Add menu button (works in all UI modes)
+        try {
+            log("Looking for .comfy-menu...");
+            const menu = document.querySelector(".comfy-menu");
+            log("Menu found:", menu);
+            
+            if (menu) {
+                log("Creating button...");
+                const linkfxButton = document.createElement("button");
+                linkfxButton.id = "linkfx-menu-button";
+                linkfxButton.textContent = "✨ Link FX";
+                linkfxButton.style.cssText = `
+                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                `;
+                
+                log("Button created:", linkfxButton);
+                
+                let panel = null;
+                linkfxButton.onclick = () => {
+                    log("Button clicked!");
+                    if (panel) {
+                        panel.remove();
+                        panel = null;
+                        return;
+                    }
+                    
+                    panel = document.createElement("div");
+                    panel.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 300px;
+                        max-height: 80vh;
+                        background: var(--comfy-menu-bg, #1a1a1a);
+                        border: 1px solid var(--border-color, #444);
+                        border-radius: 8px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+                        z-index: 10000;
+                        overflow-y: auto;
+                    `;
+                    
+                    const closeBtn = document.createElement("button");
+                    closeBtn.innerHTML = "×";
+                    closeBtn.style.cssText = `
+                        position: absolute;
+                        top: 8px;
+                        right: 8px;
+                        width: 24px;
+                        height: 24px;
+                        border: none;
+                        border-radius: 4px;
+                        background: rgba(255,255,255,0.1);
+                        color: #fff;
+                        font-size: 18px;
+                        cursor: pointer;
+                        line-height: 1;
+                        padding: 0;
+                        z-index: 1;
+                    `;
+                    closeBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        panel.remove();
+                        panel = null;
+                    };
+                    
+                    panel.appendChild(closeBtn);
+                    buildSidebarContent(panel);
+                    document.body.appendChild(panel);
+                };
+                
+                menu.appendChild(linkfxButton);
+                log("=== BUTTON APPENDED TO MENU ===");
+                log("Button in DOM:", document.getElementById("linkfx-menu-button"));
+            } else {
+                warn("Menu not found!");
+            }
+        } catch (error) {
+            warn("Failed to add menu button:", error);
+        }
+        
         const waitForCanvas = function () {
             if (app && app.canvas) installHooks();
             else setTimeout(waitForCanvas, 200);
