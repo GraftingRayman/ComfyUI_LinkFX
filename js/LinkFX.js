@@ -1178,94 +1178,139 @@ function installHooks() {
 app.registerExtension({
     name: EXTENSION_NAME,
     async setup() {
-        log("=== SETUP CALLED ===");
-        log("app exists:", !!app);
-        log("document.querySelector('.comfy-menu'):", document.querySelector(".comfy-menu"));
-        
         // Try new UI sidebar first
         registerSidebarTab();
         
-        // Add menu button (works in all UI modes)
+        const menu = document.querySelector(".comfy-menu");
+        const separator = document.createElement("hr");
+
+        separator.style.margin = "20px 0";
+        separator.style.width = "100%";
+        menu.append(separator);
+
         try {
-            log("Looking for .comfy-menu...");
-            const menu = document.querySelector(".comfy-menu");
-            log("Menu found:", menu);
-            
-            if (menu) {
-                log("Creating button...");
-                const linkfxButton = document.createElement("button");
-                linkfxButton.id = "linkfx-menu-button";
-                linkfxButton.textContent = "✨ Link FX";
-                linkfxButton.style.cssText = `
-                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-                    color: white;
+            // new style LinkFX button
+            const showLinkFXPanel = () => {
+                let panel = document.getElementById('linkfx-panel');
+                if (panel) {
+                    panel.remove();
+                    return;
+                }
+                
+                panel = document.createElement("div");
+                panel.id = 'linkfx-panel';
+                panel.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 300px;
+                    max-height: 80vh;
+                    background: var(--comfy-menu-bg, #1a1a1a);
+                    border: 1px solid var(--border-color, #444);
+                    border-radius: 8px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+                    z-index: 10000;
+                    overflow-y: auto;
                 `;
                 
-                log("Button created:", linkfxButton);
-                
-                let panel = null;
-                linkfxButton.onclick = () => {
-                    log("Button clicked!");
-                    if (panel) {
-                        panel.remove();
-                        panel = null;
-                        return;
-                    }
-                    
-                    panel = document.createElement("div");
-                    panel.style.cssText = `
-                        position: fixed;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 300px;
-                        max-height: 80vh;
-                        background: var(--comfy-menu-bg, #1a1a1a);
-                        border: 1px solid var(--border-color, #444);
-                        border-radius: 8px;
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-                        z-index: 10000;
-                        overflow-y: auto;
-                    `;
-                    
-                    const closeBtn = document.createElement("button");
-                    closeBtn.innerHTML = "×";
-                    closeBtn.style.cssText = `
-                        position: absolute;
-                        top: 8px;
-                        right: 8px;
-                        width: 24px;
-                        height: 24px;
-                        border: none;
-                        border-radius: 4px;
-                        background: rgba(255,255,255,0.1);
-                        color: #fff;
-                        font-size: 18px;
-                        cursor: pointer;
-                        line-height: 1;
-                        padding: 0;
-                        z-index: 1;
-                    `;
-                    closeBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        panel.remove();
-                        panel = null;
-                    };
-                    
-                    panel.appendChild(closeBtn);
-                    buildSidebarContent(panel);
-                    document.body.appendChild(panel);
+                const closeBtn = document.createElement("button");
+                closeBtn.innerHTML = "×";
+                closeBtn.style.cssText = `
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    width: 24px;
+                    height: 24px;
+                    border: none;
+                    border-radius: 4px;
+                    background: rgba(255,255,255,0.1);
+                    color: #fff;
+                    font-size: 18px;
+                    cursor: pointer;
+                    line-height: 1;
+                    padding: 0;
+                    z-index: 1;
+                `;
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    panel.remove();
                 };
                 
-                menu.appendChild(linkfxButton);
-                log("=== BUTTON APPENDED TO MENU ===");
-                log("Button in DOM:", document.getElementById("linkfx-menu-button"));
-            } else {
-                warn("Menu not found!");
-            }
-        } catch (error) {
-            warn("Failed to add menu button:", error);
+                panel.appendChild(closeBtn);
+                buildSidebarContent(panel);
+                document.body.appendChild(panel);
+            };
+
+            let linkfxButton = new (await import("../../scripts/ui/components/button.js")).ComfyButton({
+                icon: "sparkles",
+                action: showLinkFXPanel,
+                tooltip: "Link FX",
+                content: "Link FX",
+                classList: "comfyui-button comfyui-menu-mobile-collapse primary"
+            }).element;
+
+            app.menu?.settingsGroup.element.before(linkfxButton);
         }
+        catch(exception) {
+            console.log('ComfyUI is outdated. New style menu based features are disabled.');
+        }
+
+        // old style LinkFX button
+        const linkfxButton = document.createElement("button");
+        linkfxButton.textContent = "✨ Link FX";
+        linkfxButton.onclick = () => {
+            let panel = document.getElementById('linkfx-panel-old');
+            if (panel) {
+                panel.remove();
+                return;
+            }
+            
+            panel = document.createElement("div");
+            panel.id = 'linkfx-panel-old';
+            panel.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 300px;
+                max-height: 80vh;
+                background: var(--comfy-menu-bg, #1a1a1a);
+                border: 1px solid var(--border-color, #444);
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+                z-index: 10000;
+                overflow-y: auto;
+            `;
+            
+            const closeBtn = document.createElement("button");
+            closeBtn.innerHTML = "×";
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                width: 24px;
+                height: 24px;
+                border: none;
+                border-radius: 4px;
+                background: rgba(255,255,255,0.1);
+                color: #fff;
+                font-size: 18px;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                z-index: 1;
+            `;
+            closeBtn.onclick = (e) => {
+                e.stopPropagation();
+                panel.remove();
+            };
+            
+            panel.appendChild(closeBtn);
+            buildSidebarContent(panel);
+            document.body.appendChild(panel);
+        }
+        menu.append(linkfxButton);
         
         const waitForCanvas = function () {
             if (app && app.canvas) installHooks();
