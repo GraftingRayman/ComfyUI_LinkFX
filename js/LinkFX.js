@@ -13,6 +13,8 @@ let originalRenderLink = null;
 let animationLoopId = null;
 let sidebarContainer = null;
 let staticTime = 5000;
+let animationSpeed = 1.0;
+let lineThickness = 1.0; // NEW: Thickness multiplier
 
 const ropePhysics = new Map();
 let lastRopeCleanup = 0;
@@ -36,6 +38,11 @@ const ANIMATION_MODES = [
 const DEBUG = true; // Enabled for debugging
 const log = (...args) => { if (DEBUG) console.info(LOG_PREFIX, ...args); };
 const warn = (...args) => console.warn(LOG_PREFIX, ...args);
+
+// Helper function for scaled line widths
+function getScaledWidth(baseWidth) {
+    return baseWidth * lineThickness;
+}
 
 function bezierPoint(t, a, b, cp) {
     const mt = 1 - t;
@@ -196,9 +203,11 @@ function getRopePoints(link, a, b, len) {
     return updateRopePhysics(state, a, b, len);
 }
 
-function drawRope(ctx, points, color, lineWidth) {
+function drawRope(ctx, points, color, baseWidth) {
     color = color || "rgba(150, 150, 150, 0.8)";
-    lineWidth = lineWidth || 2;
+    baseWidth = baseWidth || 2;
+    const lineWidth = getScaledWidth(baseWidth);
+    
     if (!points || points.length < 2) return;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -255,7 +264,7 @@ function drawNeonPulse(ctx, a, b, now, len, ropePoints) {
 
     ctx.save();
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 8;
+    ctx.lineWidth = getScaledWidth(8);
     ctx.strokeStyle = "hsla(" + hue + ", 100%, 40%, 0.2)";
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
@@ -265,12 +274,12 @@ function drawNeonPulse(ctx, a, b, now, len, ropePoints) {
     grad.addColorStop(1, "hsla(" + hue + ", 100%, 60%, " + breath + ")");
 
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = getScaledWidth(4);
     ctx.strokeStyle = grad;
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = getScaledWidth(1.5);
     ctx.strokeStyle = "hsla(" + hue + ", 50%, 95%, 0.9)";
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
@@ -284,11 +293,11 @@ function drawMatrixFlow(ctx, a, b, now, len, ropePoints) {
 
     ctx.save();
     ctx.strokeStyle = "rgba(0, 60, 30, 0.4)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = getScaledWidth(1);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
     const numDrops = Math.min(Math.floor(len / 20), 15);
-    ctx.font = "bold 10px monospace";
+    ctx.font = "bold " + Math.max(8, getScaledWidth(10)) + "px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const chars = "01\u30A2\u30A4\u30A6\u30A8\u30AA\u30AB\u30AD\u30AF\u30B1\u30B3";
@@ -346,7 +355,7 @@ function drawAurora(ctx, a, b, now, len, ropePoints) {
 
         const alpha = 0.15 + Math.sin(t * 1.5 + c) * 0.1;
         ctx.strokeStyle = "hsla(" + hue + ", 90%, 65%, " + alpha + ")";
-        ctx.lineWidth = 3 + c * 0.5;
+        ctx.lineWidth = getScaledWidth(3 + c * 0.5);
         ctx.stroke();
     }
     ctx.restore();
@@ -378,15 +387,15 @@ function drawFireWire(ctx, a, b, now, len, ropePoints) {
     }
 
     ctx.strokeStyle = "rgba(200, 40, 0, 0.6)";
-    ctx.lineWidth = 8;
+    ctx.lineWidth = getScaledWidth(8);
     ctx.stroke();
 
     ctx.strokeStyle = "rgba(255, 100, 0, 0.8)";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = getScaledWidth(4);
     ctx.stroke();
 
     ctx.strokeStyle = "rgba(255, 220, 100, 0.9)";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = getScaledWidth(1.5);
     ctx.stroke();
 
     const numSparks = 6;
@@ -399,7 +408,7 @@ function drawFireWire(ctx, a, b, now, len, ropePoints) {
         const rise = Math.sin(sparkPhase * Math.PI) * 15;
         ctx.beginPath();
         ctx.fillStyle = "rgba(255, 200, 50, " + (1 - sparkPhase) + ")";
-        ctx.arc(sx, sy - rise, 1 + Math.random(), 0, Math.PI * 2);
+        ctx.arc(sx, sy - rise, getScaledWidth(1 + Math.random()), 0, Math.PI * 2);
         ctx.fill();
     }
     ctx.restore();
@@ -414,12 +423,12 @@ function drawQuantum(ctx, a, b, now, len, ropePoints) {
 
     ctx.setLineDash([4, 6]);
     ctx.strokeStyle = "rgba(130, 80, 220, 0.3)";
-    ctx.lineWidth = 6;
+    ctx.lineWidth = getScaledWidth(6);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
     ctx.setLineDash([]);
     ctx.strokeStyle = "rgba(100, 50, 180, 0.5)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = getScaledWidth(2);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
     const particle1Pos = (t * 0.3) % 1;
@@ -432,13 +441,13 @@ function drawQuantum(ctx, a, b, now, len, ropePoints) {
         const pt = getSmartPoint(pos, a, b, cp, ropePoints);
         const x = pt[0];
         const y = pt[1];
-        const cloudSize = 8 + Math.sin(t * 8 + idx * Math.PI) * 3;
+        const cloudSize = getScaledWidth(8 + Math.sin(t * 8 + idx * Math.PI) * 3);
         ctx.beginPath();
         ctx.arc(x, y, cloudSize, 0, Math.PI * 2);
         ctx.fillStyle = color.replace("0.9", "0.15");
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.arc(x, y, getScaledWidth(3), 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
     }
@@ -450,7 +459,7 @@ function drawQuantum(ctx, a, b, now, len, ropePoints) {
     ctx.moveTo(pt1[0], pt1[1]);
     ctx.lineTo(pt2[0], pt2[1]);
     ctx.strokeStyle = "rgba(200, 150, 255, " + (0.2 + Math.sin(t * 10) * 0.1) + ")";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = getScaledWidth(1);
     ctx.setLineDash([2, 4]);
     ctx.stroke();
 
@@ -463,7 +472,7 @@ function drawElectric(ctx, a, b, now, len, ropePoints) {
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = getScaledWidth(10);
     ctx.shadowColor = "rgba(100, 200, 255, 0.8)";
 
     const segments = Math.max(10, Math.ceil(len / 10));
@@ -488,7 +497,7 @@ function drawElectric(ctx, a, b, now, len, ropePoints) {
     }
 
     ctx.strokeStyle = "rgba(200, 230, 255, 0.9)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = getScaledWidth(2);
     ctx.stroke();
 
     ctx.beginPath();
@@ -509,7 +518,7 @@ function drawElectric(ctx, a, b, now, len, ropePoints) {
         else ctx.lineTo(px + offsetX, py + offsetY);
     }
     ctx.strokeStyle = "rgba(50, 150, 255, 0.3)";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = getScaledWidth(3);
     ctx.stroke();
 
     ctx.restore();
@@ -546,16 +555,16 @@ function drawPlasma(ctx, a, b, now, len, ropePoints) {
         }
 
         ctx.strokeStyle = "hsla(" + hue + ", 100%, 60%, 0.15)";
-        ctx.lineWidth = 6;
+        ctx.lineWidth = getScaledWidth(6);
         ctx.stroke();
 
         ctx.strokeStyle = "hsla(" + hue + ", 90%, 75%, 0.7)";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = getScaledWidth(2);
         ctx.stroke();
     }
 
     ctx.strokeStyle = "rgba(255, 200, 255, 0.5)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = getScaledWidth(1);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
     ctx.restore();
 }
@@ -575,10 +584,10 @@ function drawRainbow(ctx, a, b, now, len, ropePoints) {
     }
 
     ctx.strokeStyle = grad;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = getScaledWidth(5);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = getScaledWidth(2);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
     ctx.restore();
 }
@@ -593,12 +602,12 @@ function drawPulseWave(ctx, a, b, now, len, ropePoints) {
 
     ctx.save();
     ctx.strokeStyle = "rgba(80, 20, 40, 0.6)";
-    ctx.lineWidth = 5;
+    ctx.lineWidth = getScaledWidth(5);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
-    ctx.shadowBlur = 10 + (isBeat ? 10 : 0);
+    ctx.shadowBlur = getScaledWidth(10 + (isBeat ? 10 : 0));
     ctx.strokeStyle = "rgba(200, 60, 90, " + (0.4 + intensity * 0.3) + ")";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = getScaledWidth(3);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
     const numPulses = 3;
@@ -608,7 +617,7 @@ function drawPulseWave(ctx, a, b, now, len, ropePoints) {
         const px = pt[0];
         const py = pt[1];
         const fade = 1 - pulsePos * 0.5;
-        const size = 4 + (isBeat ? 2 : 0);
+        const size = getScaledWidth(4 + (isBeat ? 2 : 0));
         ctx.beginPath();
         ctx.arc(px, py, size, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(255, 150, 180, " + (fade * 0.8) + ")";
@@ -618,7 +627,7 @@ function drawPulseWave(ctx, a, b, now, len, ropePoints) {
 
     if (isBeat) {
         ctx.strokeStyle = "rgba(255, 200, 220, 0.5)";
-        ctx.lineWidth = 6;
+        ctx.lineWidth = getScaledWidth(6);
         ctx.shadowBlur = 0;
         drawSmartCurve(ctx, a, b, cp, ropePoints);
     }
@@ -632,7 +641,7 @@ function drawStarlight(ctx, a, b, now, len, ropePoints) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.strokeStyle = "rgba(150, 160, 200, 0.2)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = getScaledWidth(1);
     drawSmartCurve(ctx, a, b, cp, ropePoints);
 
     const dustCount = Math.min(40, Math.max(20, Math.floor(len / 15)));
@@ -643,7 +652,7 @@ function drawStarlight(ctx, a, b, now, len, ropePoints) {
         const px = pt[0];
         const py = pt[1];
         const life = Math.sin(pos * Math.PI);
-        const size = 0.5 + life * 1.5;
+        const size = getScaledWidth(0.5 + life * 1.5);
         const brightness = life * (0.6 + Math.sin(t * 5 + i) * 0.4);
 
         if (brightness > 0.2) {
@@ -654,7 +663,7 @@ function drawStarlight(ctx, a, b, now, len, ropePoints) {
 
             if (brightness > 0.8 && i % 5 === 0) {
                 ctx.strokeStyle = "rgba(255, 255, 255, " + (brightness * 0.6) + ")";
-                ctx.lineWidth = 1;
+                ctx.lineWidth = getScaledWidth(1);
                 const sparkSize = size * 2;
                 ctx.beginPath();
                 ctx.moveTo(px - sparkSize, py);
@@ -668,6 +677,373 @@ function drawStarlight(ctx, a, b, now, len, ropePoints) {
     ctx.restore();
 }
 
+// NEW EFFECTS START
+
+function drawCyberpunk(ctx, a, b, now, len, ropePoints) {
+    ropePoints = ropePoints || null;
+    const cp = Math.max(len * 0.3, 40);
+    const t = now * 0.001;
+    
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    
+    // Main neon line
+    ctx.shadowBlur = getScaledWidth(15);
+    ctx.shadowColor = "rgba(0, 255, 255, 0.7)";
+    ctx.strokeStyle = "rgba(0, 255, 255, 0.9)";
+    ctx.lineWidth = getScaledWidth(4);
+    drawSmartCurve(ctx, a, b, cp, ropePoints);
+    
+    // Glitch effect
+    const glitchCount = Math.floor(len / 30);
+    for (let i = 0; i < glitchCount; i++) {
+        const pos = (t * 0.5 + i * 0.2) % 1;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const glitchSize = getScaledWidth(4 + Math.sin(t * 10 + i) * 2);
+        
+        ctx.save();
+        ctx.translate(Math.sin(t * 20 + i) * 3, Math.cos(t * 20 + i) * 3);
+        ctx.fillStyle = "rgba(255, 0, 255, 0.8)";
+        ctx.fillRect(pt[0] - glitchSize/2, pt[1] - glitchSize/2, glitchSize, glitchSize);
+        ctx.restore();
+    }
+    
+    // Scan line
+    const scanPos = (t * 0.8) % 1;
+    const scanPt = getSmartPoint(scanPos, a, b, cp, ropePoints);
+    const gradient = ctx.createRadialGradient(
+        scanPt[0], scanPt[1], 0,
+        scanPt[0], scanPt[1], getScaledWidth(20)
+    );
+    gradient.addColorStop(0, "rgba(0, 255, 255, 0.9)");
+    gradient.addColorStop(1, "rgba(0, 255, 255, 0)");
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(scanPt[0], scanPt[1], getScaledWidth(20), 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+function drawHologram(ctx, a, b, now, len, ropePoints) {
+    ropePoints = ropePoints || null;
+    const cp = Math.max(len * 0.3, 40);
+    const t = now * 0.001;
+    
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    
+    // Base scan lines
+    const scanLines = 8;
+    for (let i = 0; i < scanLines; i++) {
+        const offset = (i / scanLines + t * 0.2) % 1;
+        const alpha = 0.1 + Math.sin(t * 3 + i) * 0.05;
+        
+        ctx.strokeStyle = `rgba(100, 255, 100, ${alpha})`;
+        ctx.lineWidth = getScaledWidth(1);
+        ctx.setLineDash([2, 4]);
+        const dashOffset = (t * 20) % 10;
+        ctx.lineDashOffset = dashOffset;
+        
+        drawSmartCurve(ctx, a, b, cp, ropePoints);
+    }
+    ctx.setLineDash([]);
+    
+    // Main hologram lines
+    const layers = 3;
+    for (let layer = 0; layer < layers; layer++) {
+        const hue = 120 + layer * 20;
+        const offset = (layer - 1) * 3;
+        const pulse = Math.sin(t * 2 + layer) * 0.3 + 0.7;
+        
+        ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${0.3 * pulse})`;
+        ctx.lineWidth = getScaledWidth(2);
+        
+        // Draw with slight offset for depth
+        if (ropePoints) {
+            ctx.beginPath();
+            for (let i = 0; i < ropePoints.length; i++) {
+                const p = ropePoints[i];
+                if (i === 0) ctx.moveTo(p.x + offset, p.y);
+                else ctx.lineTo(p.x + offset, p.y);
+            }
+            ctx.stroke();
+        } else {
+            drawBezier(ctx, 
+                [a[0] + offset, a[1]], 
+                [b[0] + offset, b[1]], 
+                cp
+            );
+        }
+    }
+    
+    // Data points
+    const pointCount = Math.min(20, Math.floor(len / 20));
+    for (let i = 0; i < pointCount; i++) {
+        const pos = (t * 0.3 + i * 0.05) % 1;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const size = getScaledWidth(2 + Math.sin(t * 5 + i) * 1);
+        
+        ctx.fillStyle = "rgba(0, 255, 150, 0.8)";
+        ctx.beginPath();
+        ctx.arc(pt[0], pt[1], size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    ctx.restore();
+}
+
+function drawWaterFlow(ctx, a, b, now, len, ropePoints) {
+    ropePoints = ropePoints || null;
+    const cp = Math.max(len * 0.3, 40);
+    const t = now * 0.001;
+    
+    ctx.save();
+    
+    // Water surface
+    const segments = Math.max(20, Math.floor(len / 10));
+    const waveHeight = 8;
+    
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+        const pos = i / segments;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const wave = Math.sin(t * 2 + pos * 10) * waveHeight;
+        
+        if (i === 0) ctx.moveTo(pt[0], pt[1] + wave);
+        else ctx.lineTo(pt[0], pt[1] + wave);
+    }
+    
+    // Create water gradient
+    const gradient = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    gradient.addColorStop(0, "rgba(50, 150, 255, 0.7)");
+    gradient.addColorStop(0.5, "rgba(100, 200, 255, 0.8)");
+    gradient.addColorStop(1, "rgba(50, 150, 255, 0.7)");
+    
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = getScaledWidth(6);
+    ctx.stroke();
+    
+    // Water depth
+    ctx.strokeStyle = "rgba(30, 100, 200, 0.4)";
+    ctx.lineWidth = getScaledWidth(3);
+    drawSmartCurve(ctx, a, b, cp, ropePoints);
+    
+    // Bubbles
+    const bubbleCount = Math.min(15, Math.floor(len / 30));
+    for (let i = 0; i < bubbleCount; i++) {
+        const pos = (t * 0.2 + i * 0.1) % 1;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const rise = Math.sin(pos * Math.PI) * 20;
+        const size = getScaledWidth(1 + Math.sin(t * 3 + i) * 0.5);
+        
+        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        ctx.beginPath();
+        ctx.arc(pt[0], pt[1] - rise, size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bubble highlight
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.beginPath();
+        ctx.arc(pt[0] - size/3, pt[1] - rise - size/3, getScaledWidth(size/3), 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Reflections
+    ctx.strokeStyle = "rgba(200, 230, 255, 0.2)";
+    ctx.lineWidth = getScaledWidth(1);
+    ctx.setLineDash([1, 3]);
+    drawSmartCurve(ctx, a, b, cp, ropePoints);
+    
+    ctx.restore();
+}
+
+function drawCrystal(ctx, a, b, now, len, ropePoints) {
+    ropePoints = ropePoints || null;
+    const cp = Math.max(len * 0.3, 40);
+    const t = now * 0.001;
+    
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    
+    // Main crystal core
+    const facets = 5;
+    const refraction = 3;
+    
+    for (let facet = 0; facet < facets; facet++) {
+        const hue = 200 + facet * 20;
+        const brightness = 0.5 + Math.sin(t + facet) * 0.2;
+        const alpha = 0.2 + Math.sin(t * 0.5 + facet) * 0.1;
+        
+        ctx.strokeStyle = `hsla(${hue}, 80%, ${brightness * 60}%, ${alpha})`;
+        ctx.lineWidth = getScaledWidth(3);
+        
+        // Draw with slight offset for each facet
+        if (ropePoints) {
+            ctx.beginPath();
+            for (let i = 0; i < ropePoints.length; i++) {
+                const p = ropePoints[i];
+                const offset = Math.sin(i * 0.3 + facet) * 2;
+                if (i === 0) ctx.moveTo(p.x + offset, p.y + offset);
+                else ctx.lineTo(p.x + offset, p.y + offset);
+            }
+            ctx.stroke();
+        } else {
+            // Bezier with offset
+            const offset = Math.sin(facet) * 2;
+            drawBezier(ctx, 
+                [a[0] + offset, a[1] + offset], 
+                [b[0] + offset, b[1] + offset], 
+                cp
+            );
+        }
+    }
+    
+    // Sparkle points
+    const sparkleCount = Math.min(12, Math.floor(len / 25));
+    for (let i = 0; i < sparkleCount; i++) {
+        const pos = (t * 0.15 + i * 0.08) % 1;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const sparkleTime = (t * 5 + i) % 1;
+        const size = getScaledWidth(sparkleTime < 0.5 ? sparkleTime * 4 : (1 - sparkleTime) * 4);
+        
+        if (size > 0) {
+            // Star shape
+            ctx.save();
+            ctx.translate(pt[0], pt[1]);
+            
+            const spikes = 6;
+            const outerRadius = size;
+            const innerRadius = size * 0.5;
+            
+            ctx.beginPath();
+            for (let j = 0; j < spikes * 2; j++) {
+                const radius = j % 2 === 0 ? outerRadius : innerRadius;
+                const angle = (j * Math.PI) / spikes;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                if (j === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
+            gradient.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+            gradient.addColorStop(1, "rgba(200, 230, 255, 0)");
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            ctx.restore();
+        }
+    }
+    
+    // Inner glow
+    ctx.shadowBlur = getScaledWidth(10);
+    ctx.shadowColor = "rgba(100, 200, 255, 0.5)";
+    ctx.strokeStyle = "rgba(180, 220, 255, 0.3)";
+    ctx.lineWidth = getScaledWidth(1);
+    drawSmartCurve(ctx, a, b, cp, ropePoints);
+    
+    ctx.restore();
+}
+
+function drawNeural(ctx, a, b, now, len, ropePoints) {
+    ropePoints = ropePoints || null;
+    const cp = Math.max(len * 0.3, 40);
+    const t = now * 0.001;
+    
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    
+    // Main neural pathway
+    const segments = Math.max(15, Math.floor(len / 15));
+    const nodeSize = getScaledWidth(3);
+    
+    // Draw connecting lines between nodes
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+        const pos = i / segments;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const pulse = Math.sin(t * 3 + pos * 8) * 0.3 + 0.7;
+        const offsetX = Math.cos(t * 2 + pos * 6) * pulse * 3;
+        const offsetY = Math.sin(t * 2 + pos * 6) * pulse * 3;
+        
+        if (i === 0) ctx.moveTo(pt[0] + offsetX, pt[1] + offsetY);
+        else ctx.lineTo(pt[0] + offsetX, pt[1] + offsetY);
+    }
+    
+    const gradient = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    gradient.addColorStop(0, "rgba(255, 100, 150, 0.8)");
+    gradient.addColorStop(0.5, "rgba(150, 100, 255, 0.8)");
+    gradient.addColorStop(1, "rgba(100, 200, 255, 0.8)");
+    
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = getScaledWidth(2);
+    ctx.stroke();
+    
+    // Neural nodes
+    for (let i = 0; i <= segments; i++) {
+        const pos = i / segments;
+        const pt = getSmartPoint(pos, a, b, cp, ropePoints);
+        const pulse = Math.sin(t * 5 + i) * 0.5 + 0.5;
+        const size = nodeSize + getScaledWidth(pulse * 2);
+        
+        // Node glow
+        ctx.beginPath();
+        ctx.arc(pt[0], pt[1], size * 1.5, 0, Math.PI * 2);
+        const nodeGradient = ctx.createRadialGradient(
+            pt[0], pt[1], 0,
+            pt[0], pt[1], size * 1.5
+        );
+        nodeGradient.addColorStop(0, "rgba(255, 100, 255, 0.6)");
+        nodeGradient.addColorStop(1, "rgba(255, 100, 255, 0)");
+        ctx.fillStyle = nodeGradient;
+        ctx.fill();
+        
+        // Node core
+        ctx.beginPath();
+        ctx.arc(pt[0], pt[1], size, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 150, 200, 0.9)";
+        ctx.fill();
+        
+        // Node highlight
+        ctx.beginPath();
+        ctx.arc(pt[0] - size/3, pt[1] - size/3, getScaledWidth(size/3), 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fill();
+    }
+    
+    // Synapse connections
+    const synapseCount = Math.min(8, Math.floor(len / 40));
+    for (let i = 0; i < synapseCount; i++) {
+        const pos1 = (t * 0.1 + i * 0.12) % 1;
+        const pos2 = pos1 + 0.05;
+        
+        if (pos2 <= 1) {
+            const pt1 = getSmartPoint(pos1, a, b, cp, ropePoints);
+            const pt2 = getSmartPoint(pos2, a, b, cp, ropePoints);
+            
+            ctx.beginPath();
+            ctx.moveTo(pt1[0], pt1[1]);
+            ctx.lineTo(pt2[0], pt2[1]);
+            
+            const synapsePulse = Math.sin(t * 10 + i) * 0.5 + 0.5;
+            ctx.strokeStyle = `rgba(255, 255, 100, ${0.7 * synapsePulse})`;
+            ctx.lineWidth = getScaledWidth(1);
+            ctx.setLineDash([2, 2]);
+            ctx.stroke();
+        }
+    }
+    ctx.setLineDash([]);
+    
+    ctx.restore();
+}
+
+// NEW EFFECTS END
+
 const EFFECTS = [
     { name: "Neon Pulse", icon: "\u26A1", draw: drawNeonPulse },
     { name: "Matrix Rain", icon: "\uD83D\uDC0D", draw: drawMatrixFlow },
@@ -678,7 +1054,13 @@ const EFFECTS = [
     { name: "Plasma", icon: "\uD83D\uDFE3", draw: drawPlasma },
     { name: "Rainbow", icon: "\uD83C\uDF08", draw: drawRainbow },
     { name: "Pulse Wave", icon: "\uD83D\uDC93", draw: drawPulseWave },
-    { name: "Starlight", icon: "\u2728", draw: drawStarlight }
+    { name: "Starlight", icon: "\u2728", draw: drawStarlight },
+    // New effects:
+    { name: "Cyberpunk", icon: "\uD83D\uDDA5", draw: drawCyberpunk },
+    { name: "Hologram", icon: "\uD83D\uDCBB", draw: drawHologram },
+    { name: "Water Flow", icon: "\uD83C\uDF0A", draw: drawWaterFlow },
+    { name: "Crystal", icon: "\uD83D\uDC8E", draw: drawCrystal },
+    { name: "Neural", icon: "\uD83E\uDDE0", draw: drawNeural }
 ];
 
 function startAnimationLoop() {
@@ -984,6 +1366,144 @@ function buildSidebarContent(container) {
     });
     container.appendChild(gravitySection);
 
+    // Animation Speed Section
+    const speedSection = document.createElement("div");
+    speedSection.style.marginBottom = "12px";
+    speedSection.style.padding = "8px";
+    speedSection.style.background = "var(--p-surface-ground, rgba(0,0,0,0.2))";
+    speedSection.style.borderRadius = "8px";
+
+    const speedLabel = document.createElement("div");
+    speedLabel.style.fontSize = "10px";
+    speedLabel.style.fontWeight = "600";
+    speedLabel.style.color = "var(--p-text-muted-color, #888)";
+    speedLabel.style.marginBottom = "8px";
+    speedLabel.style.textTransform = "uppercase";
+    speedLabel.style.letterSpacing = "0.5px";
+    speedLabel.style.display = "flex";
+    speedLabel.style.justifyContent = "space-between";
+    speedLabel.style.alignItems = "center";
+    
+    const speedLabelText = document.createElement("span");
+    speedLabelText.textContent = "Animation Speed";
+    
+    const speedValue = document.createElement("span");
+    speedValue.style.fontSize = "11px";
+    speedValue.style.fontWeight = "700";
+    speedValue.style.color = "var(--p-primary-color, rgba(100,150,255,0.9))";
+    speedValue.textContent = animationSpeed.toFixed(1) + "x";
+    
+    speedLabel.appendChild(speedLabelText);
+    speedLabel.appendChild(speedValue);
+    speedSection.appendChild(speedLabel);
+
+    const sliderContainer = document.createElement("div");
+    sliderContainer.style.display = "flex";
+    sliderContainer.style.alignItems = "center";
+    sliderContainer.style.gap = "8px";
+
+    const slowLabel = document.createElement("span");
+    slowLabel.textContent = "🐌";
+    slowLabel.style.fontSize = "14px";
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "0.1";
+    slider.max = "3.0";
+    slider.step = "0.1";
+    slider.value = animationSpeed.toString();
+    slider.style.flex = "1";
+    slider.style.cursor = "pointer";
+    slider.style.accentColor = "var(--p-primary-color, rgba(100,150,255,0.9))";
+
+    const fastLabel = document.createElement("span");
+    fastLabel.textContent = "🚀";
+    fastLabel.style.fontSize = "14px";
+
+    slider.addEventListener("input", function() {
+        animationSpeed = parseFloat(this.value);
+        speedValue.textContent = animationSpeed.toFixed(1) + "x";
+        if (app && app.graph) app.graph.setDirtyCanvas(true, true);
+        log("animation speed: " + animationSpeed);
+    });
+
+    sliderContainer.appendChild(slowLabel);
+    sliderContainer.appendChild(slider);
+    sliderContainer.appendChild(fastLabel);
+    speedSection.appendChild(sliderContainer);
+
+    container.appendChild(speedSection);
+
+    // NEW: Line Thickness Section
+    const thicknessSection = document.createElement("div");
+    thicknessSection.style.marginBottom = "12px";
+    thicknessSection.style.padding = "8px";
+    thicknessSection.style.background = "var(--p-surface-ground, rgba(0,0,0,0.2))";
+    thicknessSection.style.borderRadius = "8px";
+
+    const thicknessLabel = document.createElement("div");
+    thicknessLabel.style.fontSize = "10px";
+    thicknessLabel.style.fontWeight = "600";
+    thicknessLabel.style.color = "var(--p-text-muted-color, #888)";
+    thicknessLabel.style.marginBottom = "8px";
+    thicknessLabel.style.textTransform = "uppercase";
+    thicknessLabel.style.letterSpacing = "0.5px";
+    thicknessLabel.style.display = "flex";
+    thicknessLabel.style.justifyContent = "space-between";
+    thicknessLabel.style.alignItems = "center";
+
+    const thicknessLabelText = document.createElement("span");
+    thicknessLabelText.textContent = "Line Thickness";
+
+    const thicknessValue = document.createElement("span");
+    thicknessValue.style.fontSize = "11px";
+    thicknessValue.style.fontWeight = "700";
+    thicknessValue.style.color = "var(--p-primary-color, rgba(100,150,255,0.9))";
+    thicknessValue.textContent = lineThickness.toFixed(1) + "x";
+
+    thicknessLabel.appendChild(thicknessLabelText);
+    thicknessLabel.appendChild(thicknessValue);
+    thicknessSection.appendChild(thicknessLabel);
+
+    const thicknessSliderContainer = document.createElement("div");
+    thicknessSliderContainer.style.display = "flex";
+    thicknessSliderContainer.style.alignItems = "center";
+    thicknessSliderContainer.style.gap = "8px";
+
+    const thinLabel = document.createElement("span");
+    thinLabel.textContent = "─";
+    thinLabel.style.fontSize = "14px";
+    thinLabel.style.opacity = "0.7";
+
+    const thicknessSlider = document.createElement("input");
+    thicknessSlider.type = "range";
+    thicknessSlider.min = "0.1";
+    thicknessSlider.max = "3.0";
+    thicknessSlider.step = "0.1";
+    thicknessSlider.value = lineThickness.toString();
+    thicknessSlider.style.flex = "1";
+    thicknessSlider.style.cursor = "pointer";
+    thicknessSlider.style.accentColor = "var(--p-primary-color, rgba(100,150,255,0.9))";
+
+    const thickLabel = document.createElement("span");
+    thickLabel.textContent = "━━━";
+    thickLabel.style.fontSize = "14px";
+    thickLabel.style.opacity = "0.7";
+
+    thicknessSlider.addEventListener("input", function() {
+        lineThickness = parseFloat(this.value);
+        thicknessValue.textContent = lineThickness.toFixed(1) + "x";
+        if (app && app.graph) app.graph.setDirtyCanvas(true, true);
+        log("line thickness: " + lineThickness);
+    });
+
+    thicknessSliderContainer.appendChild(thinLabel);
+    thicknessSliderContainer.appendChild(thicknessSlider);
+    thicknessSliderContainer.appendChild(thickLabel);
+    thicknessSection.appendChild(thicknessSliderContainer);
+
+    container.appendChild(thicknessSection);
+
     const effectsLabel = document.createElement("div");
     effectsLabel.textContent = "Effects";
     effectsLabel.style.fontSize = "10px";
@@ -1113,7 +1633,7 @@ function shouldAnimateLink(link) {
 
 function getTimeForEffect() {
     if (animationMode === "static") return staticTime;
-    return performance.now();
+    return performance.now() * animationSpeed;
 }
 
 function installHooks() {
